@@ -20,8 +20,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyCompany("elcst")]
 [assembly: System.Reflection.AssemblyProduct("PadSwitch")]
 [assembly: System.Reflection.AssemblyCopyright("MIT License - github.com/elcst/PadSwitch")]
-[assembly: System.Reflection.AssemblyVersion("1.0.1.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.0.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.0.2.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.0.2.0")]
 
 static class Program
 {
