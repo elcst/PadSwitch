@@ -93,9 +93,21 @@ static class Settings
             k.SetValue("HoldMs", HoldMs, RegistryValueKind.DWord);
         }
     }
+    // Windows ne lance une entrée Run que si elle est aussi « autorisée » dans StartupApproved (ce que règle le Gestionnaire
+    // des tâches) : 02 = activée, 03 = désactivée par l'utilisateur. Sans cette valeur, l'entrée est ignorée sur Windows 11.
+    const string ApprovedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
     public static bool Startup
     {
-        get { using (var k = Registry.CurrentUser.OpenSubKey(RunKey)) return k != null && k.GetValue("PadSwitch") != null; }
+        get
+        {
+            using (var k = Registry.CurrentUser.OpenSubKey(RunKey))
+                if (k == null || k.GetValue("PadSwitch") == null) return false;
+            using (var a = Registry.CurrentUser.OpenSubKey(ApprovedKey))
+            {
+                var v = a == null ? null : a.GetValue("PadSwitch") as byte[];
+                return v != null && v.Length > 0 && v[0] == 2;
+            }
+        }
     }
     public static void SetStartup(bool on)
     {
@@ -103,6 +115,11 @@ static class Settings
         {
             if (on) k.SetValue("PadSwitch", "\"" + Application.ExecutablePath + "\"");
             else k.DeleteValue("PadSwitch", false);
+        }
+        using (var a = Registry.CurrentUser.CreateSubKey(ApprovedKey))
+        {
+            if (on) a.SetValue("PadSwitch", new byte[] { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, RegistryValueKind.Binary);
+            else a.DeleteValue("PadSwitch", false);
         }
     }
 }
