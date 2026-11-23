@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/switcher.png" alt="PadSwitch switcher with live window previews" width="820">
+  <img src="assets/demo.gif" alt="PadSwitch: the switcher opens, the selection glides across live window previews, then closes" width="820">
 </p>
 
 ---
@@ -111,6 +111,7 @@ This produces `PadSwitch.exe` next to the sources. Everything is in [`PadSwitch.
 | `--lang en` | Forces the UI language (put it first). |
 | `--snapshot out.png [scale] [processes]` | Renders the switcher off-screen, for example at `1.5` for 150 %, optionally limited to some processes (`notepad,explorer`). |
 | `--demo out.png` | Opens the switcher on screen for one second and captures it. |
+| `--record dir processes` | Records the switcher over a dark backdrop as timestamped PNG frames (used for the GIF above). |
 
 ## Credits
 

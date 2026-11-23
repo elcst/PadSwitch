@@ -47,6 +47,7 @@ static class Program
             t.Start(); Application.Run(); return;
         }
         if (args.Length == 2 && args[0] == "--demo") { Switcher.Demo(args[1]); return; }
+        if (args.Length == 3 && args[0] == "--record") { Switcher.Record(args[1], args[2]); return; }
 #endif
         bool created;
         using (var m = new Mutex(true, "PadSwitch.SingleInstance", out created))
@@ -488,6 +489,9 @@ class Switcher : Form
     {
         if (Visible) FinishClose();
         wins = WinList.List(Handle);
+#if DEV
+        if (DevKeep != null) wins.RemoveAll(w => !DevKeep(w));
+#endif
         if (wins.Count == 0) return;
         sel = Math.Min(DefaultIndex(wins), wins.Count - 1);
         nextRepeat = DateTime.Now.AddMilliseconds(320);   // stick déjà poussé à l'ouverture : pas de saut immédiat
@@ -713,6 +717,65 @@ class Switcher : Form
     }
 
 #if DEV
+    Predicate<Win> DevKeep;   // --record : seulement certaines fenêtres
+
+    // Enregistrement pour le GIF du README : fond sombre plein écran (rien de perso derrière les fondus), sélecteur limité
+    // à quelques processus, images capturées à ~30 i/s par un fil à part puis écrites en PNG avec leur horodatage.
+    public static void Record(string dir, string only)
+    {
+        var keep = only.ToLowerInvariant().Split(',');
+        var scr = Screen.PrimaryScreen.Bounds;
+        var back = new Form { FormBorderStyle = FormBorderStyle.None, BackColor = Color.FromArgb(10, 10, 10), StartPosition = FormStartPosition.Manual,
+            Bounds = scr, ShowInTaskbar = false, TopMost = true };
+        back.Show();
+        var s = new Switcher();
+        s.DevKeep = w => !w.Minimized && Array.IndexOf(keep, ProcessName(w.H)) >= 0;
+        var frames = new List<KeyValuePair<long, Bitmap>>(); var clock = Stopwatch.StartNew(); bool rec = false, stop = false;
+        Rectangle area = Rectangle.Empty;
+        var cap = new Thread(() =>
+        {
+            long next = 0;
+            while (!stop)
+            {
+                if (rec && clock.ElapsedMilliseconds >= next)
+                {
+                    var b = new Bitmap(area.Width, area.Height);
+                    using (var g = Graphics.FromImage(b)) g.CopyFromScreen(area.Location, Point.Empty, area.Size);
+                    lock (frames) frames.Add(new KeyValuePair<long, Bitmap>(clock.ElapsedMilliseconds, b));
+                    next = clock.ElapsedMilliseconds + 33;
+                }
+                Thread.Sleep(2);
+            }
+        }) { IsBackground = true };
+        cap.Start();
+        var steps = new[] { 400, 650, 1450, 1850, 2350, 3000, 3500 }; int step = 0;
+        var t = new System.Windows.Forms.Timer { Interval = 10 }; var t0 = Stopwatch.StartNew();
+        t.Tick += (o, e) =>
+        {
+            if (step >= steps.Length || t0.ElapsedMilliseconds < steps[step]) return;
+            switch (step)
+            {
+                case 0:   // zone de capture : le panneau, sa montée et une marge
+                    s.wins = WinList.List(s.Handle); s.wins.RemoveAll(w => !s.DevKeep(w));
+                    s.Fit(scr, DpiScale(IntPtr.Zero)); var sz = s.PanelSize();
+                    area = new Rectangle(scr.X + (scr.Width - sz.Width) / 2 - 48, scr.Y + (scr.Height - sz.Height) / 2 - 48, sz.Width + 96, sz.Height + 96 + s.Rise);
+                    rec = true; break;
+                case 1: s.Open(); break;
+                case 2: s.MoveSel(1); break;
+                case 3: s.MoveSel(1); break;
+                case 4: s.MoveSel(3); break;
+                case 5: s.BeginClose(); break;
+                case 6:
+                    rec = false; stop = true; t.Stop();
+                    lock (frames)
+                        for (int i = 0; i < frames.Count; i++) { frames[i].Value.Save(Path.Combine(dir, string.Format("f{0:D4}_{1}.png", i, frames[i].Key))); frames[i].Value.Dispose(); }
+                    back.Close(); Application.Exit(); break;
+            }
+            step++;
+        };
+        t.Start(); Application.Run();
+    }
+
     // Démo à l'écran (~1 s) : ouvre le sélecteur, capture, avance d'une carte, capture, referme.
     public static void Demo(string path)
     {
